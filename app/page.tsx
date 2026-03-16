@@ -53,6 +53,24 @@ function CallingScreen({
   const [creds, setCreds] = useState<SessionCreds | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Intercept getUserMedia before the SDK calls it — strip video so the
+  // browser only asks for microphone permission, not camera.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices) return;
+    const original = navigator.mediaDevices.getUserMedia.bind(
+      navigator.mediaDevices
+    );
+    navigator.mediaDevices.getUserMedia = (constraints) => {
+      if (constraints?.video) {
+        return original({ ...constraints, video: false });
+      }
+      return original(constraints);
+    };
+    return () => {
+      navigator.mediaDevices.getUserMedia = original;
+    };
+  }, []);
+
   useEffect(() => {
     fetch('/api/avatar/session', {
       method: 'POST',
