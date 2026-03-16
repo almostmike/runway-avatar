@@ -53,48 +53,6 @@ function CallingScreen({
   const [creds, setCreds] = useState<SessionCreds | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Intercept getUserMedia before the SDK calls it.
-  // The Runway SDK requires a video track in the WebRTC stream, but we don't
-  // want to ask the user for camera access. Instead, we inject a 1×1 black
-  // canvas stream as a fake video track — the SDK is satisfied, no camera
-  // prompt appears.
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices) return;
-    const original = navigator.mediaDevices.getUserMedia.bind(
-      navigator.mediaDevices
-    );
-
-    const makeFakeVideoTrack = (): MediaStreamTrack => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 2;
-      canvas.height = 2;
-      // Fill with a single black pixel so the stream is valid
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.fillRect(0, 0, 2, 2);
-      // captureStream(0) = 0 fps — minimal CPU, no real frames sent
-      const stream = (canvas as HTMLCanvasElement & {
-        captureStream(fps?: number): MediaStream;
-      }).captureStream(0);
-      return stream.getVideoTracks()[0];
-    };
-
-    navigator.mediaDevices.getUserMedia = async (constraints) => {
-      if (constraints?.video) {
-        // Get only audio from the real device
-        const audioStream = await original({ audio: constraints.audio ?? true, video: false });
-        // Splice in the fake video track
-        const fakeVideo = makeFakeVideoTrack();
-        if (fakeVideo) audioStream.addTrack(fakeVideo);
-        return audioStream;
-      }
-      return original(constraints);
-    };
-
-    return () => {
-      navigator.mediaDevices.getUserMedia = original;
-    };
-  }, []);
-
   useEffect(() => {
     fetch('/api/avatar/session', {
       method: 'POST',
